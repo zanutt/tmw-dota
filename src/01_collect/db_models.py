@@ -1,5 +1,7 @@
 # %%
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy import select, func
+
 class Base(DeclarativeBase):
     pass
 # %%
@@ -24,3 +26,8 @@ class Match(Base):
     version: Mapped[int] = mapped_column(nullable=True) #null
 
 # %%
+def get_oldest_match_id(engine):
+    with Session(engine) as session:
+        stmt = select(func.min(Match.match_id))
+        match_id = session.execute(stmt).scalar()
+        return match_id
