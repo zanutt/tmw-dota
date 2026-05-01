@@ -3,6 +3,8 @@ import sqlalchemy
 import db_models
 import requests
 from sqlalchemy.orm import Session
+import pandas as pd
+import datetime
 
 db_path = "./../../data/database.db"
 
@@ -15,8 +17,8 @@ class CollectorMatch():
         self.engine = engine
         self.url = "https://api.opendota.com/api/proMatches"
 
-    def get_match(self):
-        resp = requests.get(self.url)
+    def get_match(self, **kwargs):
+        resp = requests.get(self.url, params=kwargs)
         return resp
     
     def update_match(self, d, i):
@@ -56,13 +58,42 @@ class CollectorMatch():
             self.save_match(resp.json())
             return True
         else:
-            print(f"Error: {resp.status_code}")              
+            print(f"Error exec collect: {resp.status_code}")              
             return False
+        
+    def exec_collect_until(self, date='2026-04-28'):
+        resp = self.get_match()        
+        if resp.status_code != 200:
+            print(f"Error exec_collect_until: {resp.status_code}")
+            return False
+        
+        matches = resp.json()
+
+        self.save_match(matches)
+
+        older_match = matches[-1]
+
+        dt_match = (datetime.datetime.
+                    fromtimestamp(older_match['start_time']).
+                    strftime('%Y-%m-%d'))
+        
+        while date < dt_match:
+            resp = self.get_match(less_than_match_id = older_match['match_id'])
+            if resp.status_code != 200:
+                print(f"Error while fetching matches: {resp.status_code}")
+                return False
+            matches = resp.json()
+
+            self.save_match(matches)
+            dt_match = (datetime.datetime.
+                            fromtimestamp(older_match['start_time']).
+                            strftime('%Y-%m-%d'))
+            
 
 # %%
 collector = CollectorMatch(con)
 
 # %%
-result = collector.exec_collect()
+result = collector.exec_collect_until()
 result
 # %%
