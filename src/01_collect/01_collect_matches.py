@@ -3,6 +3,7 @@ import sqlalchemy
 import db_models
 import requests
 from sqlalchemy.orm import Session
+import time
 import pandas as pd
 import datetime
 
@@ -61,39 +62,38 @@ class CollectorMatch():
             print(f"Error exec collect: {resp.status_code}")              
             return False
         
-    def exec_collect_until(self, date='2026-04-28'):
-        resp = self.get_match()        
-        if resp.status_code != 200:
-            print(f"Error exec_collect_until: {resp.status_code}")
-            return False
+    def exec_collect_until(self, date='2026-04-30', from_history=True):
+
+        last_id = None
+        if from_history:
+            last_id = db_models.Match.get_oldest_match_id(self.engine)
         
-        matches = resp.json()
-
-        self.save_match(matches)
-
-        older_match = matches[-1]
-
-        dt_match = (datetime.datetime.
-                    fromtimestamp(older_match['start_time']).
-                    strftime('%Y-%m-%d'))
+        dt_match = datetime.datetime.now().strftime('%Y-%m-%d')
         
         while date < dt_match:
-            resp = self.get_match(less_than_match_id = older_match['match_id'])
+            print(f"Match Id: {last_id} | Date: {dt_match}")
+            resp = self.get_match(less_than_match_id = last_id)
             if resp.status_code != 200:
-                print(f"Error while fetching matches: {resp.status_code}")
-                return False
+                print(f"Got an error : {resp.text}, retrying in 60 seconds...")
+                time.sleep(60)
+                continue
+            
             matches = resp.json()
-
             self.save_match(matches)
+            older_match = matches[-1]
+
             dt_match = (datetime.datetime.
                             fromtimestamp(older_match['start_time']).
                             strftime('%Y-%m-%d'))
+            
+            last_id = older_match['match_id']
+        return True
             
 
 # %%
 collector = CollectorMatch(con)
 
 # %%
-result = collector.exec_collect_until()
+result = collector.exec_collect_until(date='2025-01-01', from_history=False)
 result
 # %%
